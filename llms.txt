@@ -1,0 +1,229 @@
+# collab.melody — agent authoring guide
+
+You are helping a user create notification sounds or short melodies by authoring `collab.melody` JSON files. This file teaches you the schema, the musical heuristics, and how to preview your work so the user can hear it without doing anything themselves.
+
+## The loop
+
+1. User describes a vibe ("a friendly doorbell", "an error sound that isn't jarring", "a celebratory chord")
+2. You write or modify a JSON file
+3. You play it via the bundled CLI so the user hears it
+4. You iterate on their feedback
+
+**You play the sound. Do not ask the user to.** Run the command. They listen and tell you what to change.
+
+## File format
+
+A melody is a name + a list of voices placed on a shared timeline:
+
+```json
+{
+  "name": "doorbell",
+  "voices": [
+    { "kind": "decay", "start_ms":   0, "freq_hz": 660, "duration_ms": 1000, "tau_ms": 350, "volume": 0.5 },
+    { "kind": "decay", "start_ms": 250, "freq_hz": 520, "duration_ms": 1300, "tau_ms": 450, "volume": 0.5 }
+  ]
+}
+```
+
+Every voice has a `kind` discriminator (one of the seven below — required) and a `start_ms` (int, default 0) for timeline placement. Voices overlap freely. The library mixes them.
+
+The optional top-level `duration_ms` (int, default 0) usually stays 0 — it auto-derives from the latest voice's end time. Set it explicitly only if you want trailing silence.
+
+## Voice kinds
+
+All voices share `kind` (string, required), `start_ms` (int, default 0), `volume` (double, 0..1).
+
+### tone — steady tone with edge fades
+
+| field | default | meaning |
+|-|-|-|
+| `freq_hz` | 440 | pitch |
+| `duration_ms` | 500 | length |
+| `wave` | `"sine"` | one of `"sine"`, `"square"`, `"triangle"`, `"sawtooth"` (NOT `"saw"`) |
+| `fade_ms` | 8 | linear fade in/out at edges — set to 0 only if you want clicks |
+| `volume` | 0.6 | 0..1 |
+
+### glide — smooth linear pitch slide
+
+| field | default | meaning |
+|-|-|-|
+| `from_hz` | 220 | starting pitch |
+| `to_hz` | 880 | ending pitch |
+| `duration_ms` | 800 | length |
+| `wave` | `"sine"` | waveform |
+| `fade_ms` | 8 | edge fade |
+| `volume` | 0.6 | 0..1 |
+
+Ascending (`from < to`) feels upbeat / success. Descending feels sad / giving-up.
+
+### piano — attack swell + exponential decay + harmonic stack
+
+The most expressive voice. Use this for melodies, chimes, chord blooms.
+
+| field | default | meaning |
+|-|-|-|
+| `freq_hz` | 440 | fundamental pitch |
+| `attack_ms` | 5 | rise time. **2–5** = hammered/percussive. **15–30** = plucked/soft. **50+** = bowed/swelled |
+| `tau_ms` | 500 | exponential decay time constant. **50–150** = plucky. **300–600** = piano-ish. **1000+** = bell tail |
+| `volume` | 0.4 | 0..1 |
+| `duration_ms` | 0 | total length; 0 derives from `attack + 5*tau` |
+| `harmonics` | `[1.0, 0.4, 0.2]` | per-partial amplitudes. Index `k` is the `(k+1)`th harmonic, so `[0]` = fundamental, `[1]` = ×2 freq, `[2]` = ×3 freq |
+
+Harmonics flavors:
+- `[1.0]` — pure sine, glassy / bell-like
+- `[1.0, 0.4, 0.2]` (default) — balanced piano-ish
+- `[1.0, 0.8, 0.6, 0.4]` — bright / brassy
+- `[1.0, 0.0, 0.5, 0.0, 0.3]` — odd-harmonics-only, hollow / clarinet-like
+
+### tremolo — tone with amplitude LFO (pulsing)
+
+| field | default | meaning |
+|-|-|-|
+| `freq_hz` | 440 | pitch |
+| `duration_ms` | 1500 | length |
+| `lfo_hz` | 6 | LFO rate (4–8 typical) |
+| `depth` | 0.7 | 0..1, how much the volume dips |
+| `fade_ms` | 8 | edge fade |
+| `volume` | 0.6 | 0..1 |
+
+Use for "needs your attention" alerts.
+
+### vibrato — tone with frequency LFO (wobble)
+
+| field | default | meaning |
+|-|-|-|
+| `freq_hz` | 440 | center pitch |
+| `duration_ms` | 1500 | length |
+| `lfo_hz` | 6 | LFO rate |
+| `depth_semitones` | 0.5 | pitch wobble. **0.1–0.3** = subtle. **1.0+** = obvious |
+| `fade_ms` | 8 | edge fade |
+| `volume` | 0.6 | 0..1 |
+
+Barely audible on very short notes. Use on sustained tones for "expressive / human" feel.
+
+### decay — pure sine bell, exponential decay only
+
+Like `piano` but glassier (no harmonics, no swell).
+
+| field | default | meaning |
+|-|-|-|
+| `freq_hz` | 880 | pitch |
+| `duration_ms` | 1200 | total length |
+| `tau_ms` | 200 | 1/e amplitude every `tau_ms` |
+| `fade_in_ms` | 2 | brief attack ramp |
+| `volume` | 0.7 | 0..1 |
+
+Use for chimes, dings, simple bells.
+
+### silence — explicit timeline gap
+
+| field | default | meaning |
+|-|-|-|
+| `duration_ms` | 100 | gap length |
+
+Renders to silence. Only useful for documenting intent in JSON — the timeline already produces silence between voices.
+
+## Musical heuristics
+
+### Note frequencies (equal temperament, A4 = 440)
+
+| Note | Hz | Note | Hz | Note | Hz |
+|-|-|-|-|-|-|
+| C3 | 130.81 | C4 | 261.63 | C5 | 523.25 |
+| D3 | 146.83 | D4 | 293.66 | D5 | 587.33 |
+| E3 | 164.81 | E4 | 329.63 | E5 | 659.25 |
+| F3 | 174.61 | F4 | 349.23 | F5 | 698.46 |
+| G3 | 196.00 | G4 | 392.00 | G5 | 783.99 |
+| A3 | 220.00 | A4 | 440.00 | A5 | 880.00 |
+| B3 | 246.94 | B4 | 493.88 | B5 | 987.77 |
+| | | | | C6 | 1046.50 |
+
+Octave up: double the Hz. Octave down: halve it. General formula: `freq_to = freq_from × 2^(semitones/12)`.
+
+### Intervals (frequency ratios)
+
+| Interval | Ratio | Feel |
+|-|-|-|
+| Octave | 2.0 | fat, no character |
+| Perfect fifth | 1.5 | open, neutral, "designed" |
+| Perfect fourth | 1.3348 | suspended, anticipatory |
+| Major third | 1.25 | happy |
+| Minor third | 1.2 | sad / "uh-oh" |
+
+### Translating vibes to knobs
+
+- **Happy / success** → ascending pitches; major intervals (third, fifth); bright timbre (square wave or piano with bright harmonics)
+- **Sad / fail / timeout** → descending pitches; minor intervals; lower volume; longer fades
+- **Urgent / alert** → short fast tones, repeated 2–3×; sometimes tremolo; sharp attacks
+- **Friendly / calm / nice** → piano voices, longer attack (15–40 ms), softer volume (0.3–0.4), rich harmonics, slight overlap
+- **Retro / arcade / playful** → square or sawtooth waves
+- **Designed / Apple-style chime** → piano voices with default harmonics; staggered chord notes (50–200 ms apart) ending in a sustained-bloom chord (long attack 40–80 ms, long tau 1000+ ms)
+- **Doorbell / ding-dong** → two decay voices, second starts ~250 ms after first, lower pitch second
+
+### Polyphony patterns
+
+- **Chord** — multiple voices, same `start_ms`, different `freq_hz`. Lower per-voice `volume` (0.25–0.35) since they sum.
+- **Arpeggio** — staggered `start_ms` (60–180 ms apart), each voice keeps decaying so they ring out together.
+- **Bloom** — sharp arpeggio leading into a slow-attack sustained chord at the end. Most "designed" notification sounds use this shape.
+- **Bell-tail under melody** — a long-tau decay voice on the chord root running underneath several short tones.
+
+## Preview
+
+The example CLI plays any JSON file. Path can be anywhere on disk.
+
+```bash
+# Parse + render without playing (sanity check):
+xmake run example.play_melody path/to/sound.json --validate-only --verbose
+
+# Play (user hears it):
+xmake run example.play_melody path/to/sound.json
+
+# Play with info:
+xmake run example.play_melody path/to/sound.json --verbose
+```
+
+While iterating, write to a temp path like `melodies/_scratch.json` so you don't pollute the bundled set. Once the user is happy, rename to a final name.
+
+To play every bundled melody as a tour:
+
+```bash
+xmake run example.melody_demo
+xmake run example.melody_demo --filter chord    # only matching names
+xmake run example.melody_demo --list            # don't play, just list
+```
+
+## Reference melodies
+
+Read existing files under `melodies/` to learn patterns. Especially useful:
+
+- `chord.json` — the full bloom recipe: arpeggio into a sustained chord
+- `doorbell.json` — overlapping decay voices, ding-dong rhythm
+- `notification.json` — three-note bell stack with staggered starts
+- `startup_chime.json` — Mac-style soft swell
+- `error.json`, `success.json`, `confirm_question.json` — short notification recipes
+- `boop.json`, `beep.json` — descending and ascending glides
+
+When the user says "make it like X", check if X is already covered and start from that file.
+
+## Don'ts
+
+- **Don't ask the user to play the sound.** You play it via the CLI. They listen.
+- **Don't use `"saw"`** for the wave — it's `"sawtooth"`. `wave` accepts only `"sine"`, `"square"`, `"triangle"`, `"sawtooth"`.
+- **Don't set `volume > 1.0`** — it clamps anyway.
+- **Don't set `fade_ms` to 0** unless you specifically want a click — leave defaults alone.
+- **Don't stack many voices at full volume.** The mix clips at 1.0. With 4+ voices simultaneously, drop per-voice volume to 0.25–0.35.
+- **Don't omit `kind`.** It's how the loader picks which struct to deserialize.
+- **Don't include extra fields the schema doesn't define.** They're ignored, which makes typos silent — review carefully.
+- **Don't render long sounds (>5 s) unless asked.** Notification sounds are usually under 1.5 s. Long sounds get annoying fast.
+
+## Workflow checklist
+
+When iterating with a user:
+
+1. Translate their vibe into a voice plan (which kinds, which freqs, which timing)
+2. Write the JSON to `melodies/_scratch.json`
+3. `xmake run example.play_melody melodies/_scratch.json --validate-only` — confirm it parses
+4. `xmake run example.play_melody melodies/_scratch.json` — let the user hear it
+5. Ask what they'd change, iterate
+6. When they're happy, save under a real name (`melodies/<name>.json`)
+7. Confirm with them before deleting `_scratch.json`
