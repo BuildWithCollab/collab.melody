@@ -84,218 +84,167 @@ Fifteen reference melodies ship under `melodies/`. Drop them in, copy them, muta
 
 ## Public API
 
-All declarations live in `namespace collab::melody`. Most apps only need `import collab.melody;` (the umbrella) and never name a submodule directly.
+All declarations live in `namespace collab::melody`. Most apps only need `import collab.melody;` (the umbrella) — submodules below are listed for reference.
 
 ### `collab.melody.voices`
 
-Data types — voice structs plus the `Voice` variant. Each voice's `kind` member defaults to its label and is the discriminator used by JSON round-trip.
+The data model — a `Wave` enum, seven voice structs, and the `Voice` variant tying them together.
 
-```cpp
-namespace collab::melody {
+`enum class Wave` — `sine`, `square`, `triangle`, `sawtooth`.
 
-enum class Wave { sine, square, triangle, sawtooth };
+Every voice struct carries a `kind` discriminator (`std::string`, defaults to the kind's label — you don't usually set it manually) and a `start_ms` (`int`, default `0`) for timeline placement. The kind-specific fields:
 
-struct ToneVoice {
-    std::string kind        = "tone";
-    int         start_ms    = 0;
-    double      freq_hz     = 440.0;
-    int         duration_ms = 500;
-    Wave        wave        = Wave::sine;
-    int         fade_ms     = 8;
-    double      volume      = 0.6;
-};
+#### `ToneVoice` — steady tone with edge fades
 
-struct GlideVoice {
-    std::string kind        = "glide";
-    int         start_ms    = 0;
-    double      from_hz     = 220.0;
-    double      to_hz       = 880.0;
-    int         duration_ms = 800;
-    Wave        wave        = Wave::sine;
-    int         fade_ms     = 8;
-    double      volume      = 0.6;
-};
+| Field | Type | Default | Meaning |
+|-|-|-|-|
+| `freq_hz` | `double` | `440` | pitch |
+| `duration_ms` | `int` | `500` | length |
+| `wave` | `Wave` | `sine` | waveform |
+| `fade_ms` | `int` | `8` | linear fade-in / fade-out at edges (anti-click) |
+| `volume` | `double` | `0.6` | 0..1 |
 
-struct PianoVoice {
-    std::string         kind        = "piano";
-    int                 start_ms    = 0;
-    double              freq_hz     = 440.0;
-    int                 attack_ms   = 5;
-    int                 tau_ms      = 500;
-    double              volume      = 0.4;
-    int                 duration_ms = 0;             // 0 = derive from attack + ~5*tau
-    std::vector<double> harmonics   = {1.0, 0.4, 0.2};
-};
+#### `GlideVoice` — smooth pitch slide
 
-struct TremoloVoice {
-    std::string kind        = "tremolo";
-    int         start_ms    = 0;
-    double      freq_hz     = 440.0;
-    int         duration_ms = 1500;
-    double      lfo_hz      = 6.0;
-    double      depth       = 0.7;                   // 0..1, fraction the volume dips by
-    int         fade_ms     = 8;
-    double      volume      = 0.6;
-};
+| Field | Type | Default | Meaning |
+|-|-|-|-|
+| `from_hz` | `double` | `220` | starting pitch |
+| `to_hz` | `double` | `880` | ending pitch |
+| `duration_ms` | `int` | `800` | length |
+| `wave` | `Wave` | `sine` | waveform |
+| `fade_ms` | `int` | `8` | edge fade |
+| `volume` | `double` | `0.6` | 0..1 |
 
-struct VibratoVoice {
-    std::string kind            = "vibrato";
-    int         start_ms        = 0;
-    double      freq_hz         = 440.0;
-    int         duration_ms     = 1500;
-    double      lfo_hz          = 6.0;
-    double      depth_semitones = 0.5;               // pitch wobble in semitones
-    int         fade_ms         = 8;
-    double      volume          = 0.6;
-};
+#### `PianoVoice` — attack swell + exponential decay + harmonic stack
 
-struct DecayVoice {
-    std::string kind        = "decay";
-    int         start_ms    = 0;
-    double      freq_hz     = 880.0;
-    int         duration_ms = 1200;
-    int         tau_ms      = 200;                   // 1/e amplitude every tau_ms
-    int         fade_in_ms  = 2;
-    double      volume      = 0.7;
-};
+| Field | Type | Default | Meaning |
+|-|-|-|-|
+| `freq_hz` | `double` | `440` | fundamental pitch |
+| `attack_ms` | `int` | `5` | rise time (small = hammered, large = swelled) |
+| `tau_ms` | `int` | `500` | exponential decay time constant |
+| `volume` | `double` | `0.4` | 0..1 |
+| `duration_ms` | `int` | `0` | total length; `0` derives from `attack + 5*tau` |
+| `harmonics` | `std::vector<double>` | `{1.0, 0.4, 0.2}` | per-partial amplitudes (1st, 2nd, 3rd harmonic, …) |
 
-struct SilenceVoice {
-    std::string kind        = "silence";
-    int         start_ms    = 0;
-    int         duration_ms = 100;
-};
+#### `TremoloVoice` — amplitude LFO (pulsing)
 
-using Voice = std::variant<
-    ToneVoice, GlideVoice, PianoVoice,
-    TremoloVoice, VibratoVoice, DecayVoice, SilenceVoice
->;
+| Field | Type | Default | Meaning |
+|-|-|-|-|
+| `freq_hz` | `double` | `440` | pitch |
+| `duration_ms` | `int` | `1500` | length |
+| `lfo_hz` | `double` | `6` | LFO rate |
+| `depth` | `double` | `0.7` | 0..1, fraction the volume dips by |
+| `fade_ms` | `int` | `8` | edge fade |
+| `volume` | `double` | `0.6` | 0..1 |
 
-// nlohmann ADL hooks — fire automatically when a Melody round-trips
-// through def_type. Apps don't typically call these directly.
-void to_json  (nlohmann::json& j, const Voice& v);
-void from_json(const nlohmann::json& j, Voice& v);
+#### `VibratoVoice` — frequency LFO (wobble)
 
-}  // namespace collab::melody
-```
+| Field | Type | Default | Meaning |
+|-|-|-|-|
+| `freq_hz` | `double` | `440` | center pitch |
+| `duration_ms` | `int` | `1500` | length |
+| `lfo_hz` | `double` | `6` | LFO rate |
+| `depth_semitones` | `double` | `0.5` | pitch wobble in semitones |
+| `fade_ms` | `int` | `8` | edge fade |
+| `volume` | `double` | `0.6` | 0..1 |
+
+#### `DecayVoice` — pure sine bell
+
+| Field | Type | Default | Meaning |
+|-|-|-|-|
+| `freq_hz` | `double` | `880` | pitch |
+| `duration_ms` | `int` | `1200` | total length |
+| `tau_ms` | `int` | `200` | 1/e amplitude every `tau_ms` |
+| `fade_in_ms` | `int` | `2` | brief attack ramp |
+| `volume` | `double` | `0.7` | 0..1 |
+
+#### `SilenceVoice` — explicit timeline gap
+
+| Field | Type | Default | Meaning |
+|-|-|-|-|
+| `duration_ms` | `int` | `100` | gap length |
+
+Renders to silence (which is what gaps already produce) — useful for documenting intent in JSON.
+
+#### `Voice`
+
+`std::variant<ToneVoice, GlideVoice, PianoVoice, TremoloVoice, VibratoVoice, DecayVoice, SilenceVoice>`. Inspect with `std::holds_alternative<T>` / `std::get<T>`, or dispatch with `std::visit`. JSON round-trip is automatic — the `kind` field discriminates on deserialize.
+
+ADL hooks `to_json(nlohmann::json&, const Voice&)` and `from_json(const nlohmann::json&, Voice&)` are exported but apps don't usually call them directly — they fire when a `Melody` round-trips through `def_type`.
+
+---
 
 ### `collab.melody.melody`
 
-The top-level container — a name and a list of voices on a shared timeline.
+#### `Melody`
 
-```cpp
-namespace collab::melody {
+| Field | Type | Default | Meaning |
+|-|-|-|-|
+| `name` | `std::string` | `""` | human-readable label |
+| `duration_ms` | `int` | `0` | total length; `0` derives from voices |
+| `voices` | `std::vector<Voice>` | `{}` | the voices on the timeline |
 
-struct Melody {
-    std::string        name;
-    int                duration_ms = 0;   // 0 = derive from voices
-    std::vector<Voice> voices;
-};
-
-}
-```
+---
 
 ### `collab.melody.render`
 
-Mix every voice into a single PCM buffer. int32 accumulator internally so heavy polyphony doesn't smear per-voice clipping into the result.
+Mix every voice in a `Melody` into a single PCM buffer. Internally accumulates in int32 so heavy polyphony doesn't smear per-voice clipping into the result.
 
-```cpp
-namespace collab::melody {
+#### `RenderedAudio`
 
-constexpr int kSampleRate = 44100;        // mono int16 PCM @ 44.1 kHz
+| Field | Type | Default | Meaning |
+|-|-|-|-|
+| `samples` | `std::vector<std::int16_t>` | `{}` | mono PCM samples |
+| `sample_rate` | `int` | `kSampleRate` (44100) | rate the buffer was rendered at |
 
-struct RenderedAudio {
-    std::vector<std::int16_t> samples;
-    int                       sample_rate = kSampleRate;
-};
+#### Functions
 
-// One voice's audible length. PianoVoice with duration_ms=0 is auto-
-// derived from attack + 5*tau; everything else returns its duration_ms.
-[[nodiscard]] int voice_duration_ms(const Voice& voice);
+- **`constexpr int kSampleRate = 44100`** — the rate every render is produced at (mono int16).
+- **`int voice_duration_ms(const Voice&)`** — audible length of one voice. `PianoVoice` with `duration_ms = 0` returns `attack + 5*tau`; every other voice returns its `duration_ms`.
+- **`int derive_duration_ms(const Melody&)`** — total length the buffer needs. Returns `melody.duration_ms` if non-zero, otherwise `max(start_ms + duration_ms)` across voices.
+- **`RenderedAudio render(const Melody&)`** — the thing you usually call.
 
-// max(start_ms + duration_ms) across all voices, or melody.duration_ms
-// if non-zero.
-[[nodiscard]] int derive_duration_ms(const Melody& melody);
-
-// The thing you usually call.
-[[nodiscard]] RenderedAudio render(const Melody& melody);
-
-}
-```
+---
 
 ### `collab.melody.io`
 
-JSON load/save plus bulk-loading a folder of melodies.
+JSON load/save plus bulk-loading a folder. All loaders throw `std::runtime_error` with a descriptive message on IO or parse failure — the message includes the offending path.
 
-```cpp
-namespace collab::melody {
+- **`Melody load_from_json_file(const std::filesystem::path& path)`** — read a melody from a `.json` file.
+- **`Melody load_from_json_string(std::string_view json)`** — parse a melody from an in-memory JSON string.
+- **`std::string to_json_string(const Melody&, int indent = 2)`** — serialize. `indent < 0` is compact; `indent >= 0` is pretty-printed with that many spaces.
+- **`void save_to_json_file(const Melody&, const std::filesystem::path& path)`** — pretty-print to a `.json` file. Creates parent directories as needed.
+- **`std::map<std::string, Melody> load_all_from_directory(const std::filesystem::path& dir, std::function<void(const std::filesystem::path&, std::string_view error)> error_callback = {})`** — load every `*.json` in `dir` (non-recursive), keyed by file stem. Per-file failures go to `error_callback` if supplied; other files still load. Empty / missing dir returns empty map — never throws.
 
-// Throw std::runtime_error with a useful message on file IO / parse errors.
-[[nodiscard]] Melody load_from_json_file  (const std::filesystem::path& path);
-[[nodiscard]] Melody load_from_json_string(std::string_view json);
-
-// indent < 0  → compact;  indent >= 0  → pretty-printed with that many spaces.
-[[nodiscard]] std::string to_json_string(const Melody& melody, int indent = 2);
-
-void save_to_json_file(const Melody& melody, const std::filesystem::path& path);
-
-// Load every *.json in `dir` (non-recursive), keyed by file stem.
-// Failures are reported via the callback (if supplied); other files still load.
-// Empty / missing dir returns empty map — never throws.
-[[nodiscard]] std::map<std::string, Melody> load_all_from_directory(
-    const std::filesystem::path& dir,
-    std::function<void(const std::filesystem::path&, std::string_view error)> error_callback = {}
-);
-
-}
-```
+---
 
 ### `collab.melody.player`
 
 miniaudio-backed playback. Two flavors — one-shot blocking, or a reusable `Player` that keeps a device warm across many sounds.
 
-```cpp
-namespace collab::melody {
+#### Free functions
 
-// Open device, play to completion, close. Returns false if device init failed.
-bool play_blocking(const RenderedAudio& audio);
-bool play_blocking(const Melody& melody);          // = play_blocking(render(melody))
+- **`bool play_blocking(const RenderedAudio&)`** — open the device, play to completion, close. Returns `false` on device-init failure.
+- **`bool play_blocking(const Melody&)`** — convenience: `play_blocking(render(melody))`.
 
-// Reusable player. One sound at a time — calling play() while another is
-// playing waits for the previous one to finish, then starts the new one.
-class Player {
-public:
-    Player();
-    ~Player();
+#### `class Player`
 
-    Player(const Player&)            = delete;
-    Player& operator=(const Player&) = delete;
-    Player(Player&&)                 = delete;
-    Player& operator=(Player&&)      = delete;
+A reusable player. One sound at a time — `play()` waits for any in-flight play to finish before starting the next. Non-copyable, non-movable.
 
-    [[nodiscard]] bool play(const RenderedAudio& audio);
-    [[nodiscard]] bool play(const Melody& melody);
+| Method | Returns | Behavior |
+|-|-|-|
+| `Player()` / `~Player()` | — | construct / tear down (device opened lazily on first `play`) |
+| `play(const RenderedAudio&)` | `bool` | start playback (waits for any in-flight); `false` on device-init failure |
+| `play(const Melody&)` | `bool` | renders, then plays |
+| `is_playing() const noexcept` | `bool` | `true` between `play()` returning and the audio finishing |
+| `wait()` | `void` | block until current playback (if any) finishes |
+| `cancel() noexcept` | `void` | stop in-flight playback; safe to call from any thread |
 
-    [[nodiscard]] bool is_playing() const noexcept;
-
-    void wait();              // block until the current play (if any) finishes
-    void cancel() noexcept;   // stop in-flight playback; safe from any thread
-};
-
-}
-```
+---
 
 ### `collab.melody`
 
-Umbrella module. Just re-exports every submodule:
-
-```cpp
-export module collab.melody;
-export import collab.melody.voices;
-export import collab.melody.melody;
-export import collab.melody.render;
-export import collab.melody.io;
-export import collab.melody.player;
-```
+Umbrella module — re-exports every submodule above. Most apps `import collab.melody;` and never name a submodule directly.
 
 ---
 
