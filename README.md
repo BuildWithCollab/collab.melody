@@ -15,6 +15,7 @@ That's the whole API for the common case. 🎯
 
 ## Contents
 
+- [Designing sounds with a coding agent](#designing-sounds-with-a-coding-agent)
 - [What's in the box](#whats-in-the-box)
 - [The voice kinds](#the-voice-kinds)
 - [JSON shape](#json-shape)
@@ -30,6 +31,22 @@ That's the whole API for the common case. 🎯
 - [Building](#building)
 - [Dependencies](#dependencies)
 - [License](#license)
+
+---
+
+## Designing sounds with a coding agent
+
+Don't want to fiddle with `freq_hz` and `tau_ms` yourself? **Point your coding agent at [`llms.txt`](./llms.txt) at the repo root.** It's a self-contained guide that teaches an agent the JSON schema, the musical heuristics ("happy → ascending major intervals", "Apple-style → piano voices with staggered chord bloom"), and the preview workflow.
+
+The collaboration loop:
+
+1. You: "make me a friendly notification sound — short, warm, not jarring"
+2. Agent writes a JSON melody, runs `xmake run example.play_melody …` so you hear it
+3. You: "the second note is too sharp, soften the attack"
+4. Agent edits, plays again
+5. Repeat until it's right, then save under a real filename in `melodies/`
+
+You listen, the agent does the typing and the speaker-driving. 🤖🔊
 
 ---
 
