@@ -65,6 +65,8 @@ Fifteen reference melodies ship under `melodies/`. Drop them in, copy them, muta
 ## C++ authoring
 
 ```cpp
+import collab.melody;
+
 using namespace collab::melody;
 
 Melody chord{
@@ -83,10 +85,12 @@ save_to_json_file(chord, "chord.json");     // round-trip back to JSON
 For apps that fire many notifications, hold a `Player` once instead of opening / closing the device each time:
 
 ```cpp
-Player player;
-player.play(load_from_json_file("error.json"));
+import collab.melody;
+
+collab::melody::Player player;
+player.play(collab::melody::load_from_json_file("error.json"));
 player.wait();
-player.play(load_from_json_file("retry.json"));
+player.play(collab::melody::load_from_json_file("retry.json"));
 player.wait();
 ```
 
@@ -95,12 +99,14 @@ player.wait();
 ## Bundle a folder of melodies in your app
 
 ```cpp
-auto melodies = load_all_from_directory("./sounds",
+import collab.melody;
+
+auto melodies = collab::melody::load_all_from_directory("./sounds",
     [](const auto& path, std::string_view err) {
         std::cerr << "skipping " << path << ": " << err << '\n';
     });
 
-play_blocking(melodies.at("error"));
+collab::melody::play_blocking(melodies.at("error"));
 ```
 
 Empty / missing directory returns empty map — never throws.
