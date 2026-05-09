@@ -13,6 +13,26 @@ That's the whole API for the common case. 🎯
 
 ---
 
+## Contents
+
+- [What's in the box](#whats-in-the-box)
+- [The voice kinds](#the-voice-kinds)
+- [JSON shape](#json-shape)
+- [Public API](#public-api)
+  - [`collab.melody.voices`](#collabmelodyvoices)
+  - [`collab.melody.melody`](#collabmelodymelody)
+  - [`collab.melody.render`](#collabmelodyrender)
+  - [`collab.melody.io`](#collabmelodyio)
+  - [`collab.melody.player`](#collabmelodyplayer)
+  - [`collab.melody`](#collabmelody)
+- [C++ authoring](#c-authoring)
+- [Bundle a folder of melodies in your app](#bundle-a-folder-of-melodies-in-your-app)
+- [Building](#building)
+- [Dependencies](#dependencies)
+- [License](#license)
+
+---
+
 ## What's in the box
 
 | Module | Role |
