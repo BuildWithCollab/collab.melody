@@ -1,0 +1,6 @@
+{
+  "name": "stop",
+  "voices": [
+    { "kind": "tone", "start_ms": 0, "freq_hz": 400, "duration_ms": 150, "wave": "sine", "fade_ms": 8, "volume": 0.6 }
+  ]
+}

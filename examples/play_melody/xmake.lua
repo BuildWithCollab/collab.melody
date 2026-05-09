@@ -1,0 +1,7 @@
+target("example.play_melody")
+    set_kind("binary")
+    add_files("main.cpp")
+    add_deps("collab.melody")
+    add_packages("cli11")
+    set_rundir("$(projectdir)")
+target_end()

@@ -1,0 +1,9 @@
+{
+  "name": "arpeggio",
+  "voices": [
+    { "kind": "piano", "start_ms":   0, "freq_hz": 392.00, "attack_ms": 3, "tau_ms": 250, "volume": 0.40 },
+    { "kind": "piano", "start_ms":  90, "freq_hz": 493.88, "attack_ms": 3, "tau_ms": 250, "volume": 0.40 },
+    { "kind": "piano", "start_ms": 180, "freq_hz": 587.33, "attack_ms": 3, "tau_ms": 250, "volume": 0.40 },
+    { "kind": "piano", "start_ms": 270, "freq_hz": 783.99, "attack_ms": 3, "tau_ms": 700, "volume": 0.45 }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "timeout",
+  "voices": [
+    { "kind": "tone", "start_ms":   0, "freq_hz": 400, "duration_ms": 120, "fade_ms": 6, "volume": 0.55 },
+    { "kind": "tone", "start_ms": 180, "freq_hz": 300, "duration_ms": 120, "fade_ms": 6, "volume": 0.55 }
+  ]
+}

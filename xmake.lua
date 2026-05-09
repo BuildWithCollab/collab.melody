@@ -19,10 +19,15 @@ option("build_examples")
     set_description("Build example binaries")
 option_end()
 
-includes("xmake/*.lua")
+includes("xmake/collab.lua")
 
-add_requires("def_type") -- For serialization of the melody instructions
-add_requires("miniaudio") -- Is this required for sure or only by the app that plays the sounds?
+-- def_type drives the JSON serialization of melody/voice structs.
+-- miniaudio is only required by the player module. We keep it as a hard
+-- dep because playback is the obvious use case for this library; if
+-- offline-only consumers ever appear, the player can be split into its
+-- own sibling library (collab.melody.player) to drop the dep.
+add_collab_requires("def_type")
+add_requires("miniaudio")
 
 if get_config("build_examples") then
     add_requires("cli11")
@@ -32,7 +37,7 @@ if get_config("build_tests") then
     add_requires("catch2")
 end
 
-includes("lib/collab.platform/xmake.lua")
+includes("lib/collab.melody/xmake.lua")
 
 if get_config("build_examples") then
     includes("examples/xmake.lua")

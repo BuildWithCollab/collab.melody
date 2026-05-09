@@ -1,0 +1,13 @@
+{
+  "name": "chord",
+  "voices": [
+    { "kind": "piano", "start_ms":   0, "freq_hz":  523.25, "attack_ms":  3, "tau_ms":  600, "volume": 0.45 },
+    { "kind": "piano", "start_ms": 180, "freq_hz":  659.25, "attack_ms":  6, "tau_ms":  600, "volume": 0.45 },
+    { "kind": "piano", "start_ms": 360, "freq_hz":  783.99, "attack_ms": 12, "tau_ms":  600, "volume": 0.45 },
+    { "kind": "piano", "start_ms": 540, "freq_hz": 1046.50, "attack_ms": 20, "tau_ms":  700, "volume": 0.40 },
+
+    { "kind": "piano", "start_ms": 760, "freq_hz":  523.25, "attack_ms": 60, "tau_ms": 1400, "volume": 0.30 },
+    { "kind": "piano", "start_ms": 760, "freq_hz":  659.25, "attack_ms": 60, "tau_ms": 1400, "volume": 0.30 },
+    { "kind": "piano", "start_ms": 760, "freq_hz":  783.99, "attack_ms": 60, "tau_ms": 1400, "volume": 0.30 }
+  ]
+}

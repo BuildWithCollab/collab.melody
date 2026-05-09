@@ -1,0 +1,7 @@
+{
+  "name": "success",
+  "voices": [
+    { "kind": "tone", "start_ms":   0, "freq_hz":  900, "duration_ms": 100, "fade_ms": 6, "volume": 0.55 },
+    { "kind": "tone", "start_ms": 160, "freq_hz": 1200, "duration_ms": 100, "fade_ms": 6, "volume": 0.55 }
+  ]
+}

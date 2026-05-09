@@ -1,0 +1,10 @@
+{
+  "name": "startup_chime",
+  "voices": [
+    { "kind": "piano", "start_ms":   0, "freq_hz": 261.63, "attack_ms":  8, "tau_ms": 1500, "volume": 0.30 },
+    { "kind": "piano", "start_ms":  40, "freq_hz": 392.00, "attack_ms":  8, "tau_ms": 1500, "volume": 0.28 },
+    { "kind": "piano", "start_ms":  80, "freq_hz": 523.25, "attack_ms":  8, "tau_ms": 1500, "volume": 0.26 },
+    { "kind": "piano", "start_ms": 120, "freq_hz": 659.25, "attack_ms":  8, "tau_ms": 1500, "volume": 0.26 },
+    { "kind": "piano", "start_ms": 160, "freq_hz": 783.99, "attack_ms": 12, "tau_ms": 1800, "volume": 0.24 }
+  ]
+}

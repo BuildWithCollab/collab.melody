@@ -1,0 +1,8 @@
+target("tests-collab.melody")
+    set_kind("binary")
+    add_files("**.cpp")
+    add_deps("collab.melody")
+    add_packages("catch2")
+    set_rundir("$(projectdir)")
+    add_tests("default", {runargs = {"--durations", "yes"}})
+target_end()

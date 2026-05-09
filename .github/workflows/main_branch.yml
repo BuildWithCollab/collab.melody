@@ -1,0 +1,115 @@
+name: Main Branch
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.json'
+      - 'docs/**'
+      - '.claude/**'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-and-test:
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "macOS · Apple Clang"
+            os: macos-latest
+          - name: "macOS · Clang 21"
+            os: macos-latest
+            toolchain: llvm
+          - name: "Linux · GCC 14"
+            os: ubuntu-latest
+            toolchain: gcc-14
+          - name: "Linux · GCC 15"
+            os: ubuntu-latest
+            toolchain: gcc-15
+          - name: "Windows · VS 2026"
+            os: windows-2025-vs2026
+          - name: "Windows · VS 2022"
+            os: windows-latest
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install xmake
+        uses: xmake-io/github-action-setup-xmake@cc0f56c35b75d0975ed5d9e29005fae707721cd5 # v1
+
+      - name: Cache xmake packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.xmake/packages
+            ~/AppData/Local/.xmake/packages
+          key: xmake-${{ matrix.name }}-${{ hashFiles('**/xmake.lua') }}
+          restore-keys: |
+            xmake-${{ matrix.name }}-
+
+      - name: Install GCC 14 (Linux)
+        if: matrix.toolchain == 'gcc-14'
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y gcc-14 g++-14
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+
+      - name: Install GCC 15 (Linux)
+        if: matrix.toolchain == 'gcc-15'
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y gcc-15 g++-15
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+
+      - name: Install Clang 21 (macOS)
+        if: matrix.toolchain == 'llvm'
+        run: |
+          brew install llvm@21
+          echo "$(brew --prefix llvm@21)/bin" >> $GITHUB_PATH
+
+      - name: Configure (Linux GCC)
+        if: startsWith(matrix.toolchain, 'gcc-')
+        run: xmake config --toolchain=gcc -y
+
+      - name: Configure (macOS Clang 21)
+        if: matrix.toolchain == 'llvm'
+        run: xmake config --toolchain=llvm --sdk="$(brew --prefix llvm@21)" -y
+
+      - name: Configure (macOS Apple Clang)
+        if: runner.os == 'macOS' && matrix.toolchain == ''
+        run: xmake config -y
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: xmake config -y
+
+      - name: Build
+        run: xmake build -a
+
+      - name: Run tests
+        run: xmake test -v
+
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: slackapi/slack-github-action@v2
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            channel: ${{ secrets.SLACK_GHA_FAILURES_CHANNEL_ID }}
+            text: "🚨 *${{ github.repository }}* failed on *${{ matrix.name }}*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"

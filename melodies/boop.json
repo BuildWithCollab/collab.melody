@@ -1,0 +1,6 @@
+{
+  "name": "boop",
+  "voices": [
+    { "kind": "glide", "start_ms": 0, "from_hz": 880, "to_hz": 220, "duration_ms": 280, "wave": "sine", "fade_ms": 8, "volume": 0.5 }
+  ]
+}
