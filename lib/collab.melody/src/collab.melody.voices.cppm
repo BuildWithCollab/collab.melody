@@ -9,6 +9,8 @@ module;
 
 export module collab.melody.voices;
 
+import std;
+
 export namespace collab::melody {
 
 enum class Wave {
