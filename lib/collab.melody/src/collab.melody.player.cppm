@@ -13,9 +13,12 @@
 // data callback through a single-producer / single-consumer queue.
 // The miniaudio details live in the .cpp implementation file.
 
+module;
+
+#include <memory>
+
 export module collab.melody.player;
 
-import std;
 import collab.melody.render;
 import collab.melody.melody;
 

@@ -2,9 +2,13 @@
 // Plain aggregate — PFR auto-discovers fields, def_type round-trips it
 // through JSON for free.
 
+module;
+
+#include <string>
+#include <vector>
+
 export module collab.melody.melody;
 
-import std;
 import collab.melody.voices;
 
 export namespace collab::melody {

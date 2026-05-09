@@ -15,7 +15,6 @@ module;
 
 export module collab.melody.render;
 
-import std;
 import collab.melody.voices;
 import collab.melody.melody;
 

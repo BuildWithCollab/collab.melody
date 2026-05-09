@@ -5,9 +5,17 @@ module;
 
 #include <def_type.hpp>
 
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <map>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+
 export module collab.melody.io;
 
-import std;
 import collab.melody.melody;
 
 export namespace collab::melody {
