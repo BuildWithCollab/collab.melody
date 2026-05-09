@@ -1,5 +1,10 @@
 set_project("collab.melody")
 
+-- This registry has override of nlohmann_json (and other packages) which fix support for usage in C++20 modules
+-- Note: the nlohmann_json is the same as using the develop branch: https://github.com/nlohmann/json (module support not yet published)
+-- This is hopefully only needed temporarily until one day these packages are updatedin the main xmake registry.
+add_repositories("BuildWithCollab_PackagesWithModuleSupport https://github.com/BuildWithCollab/PackagesWithModuleSupport")
+
 add_rules("mode.release")
 set_defaultmode("release")
 
