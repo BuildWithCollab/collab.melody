@@ -185,9 +185,7 @@ Renders to silence (which is what gaps already produce) — useful for documenti
 
 #### `Voice`
 
-`std::variant<ToneVoice, GlideVoice, PianoVoice, TremoloVoice, VibratoVoice, DecayVoice, SilenceVoice>`. Inspect with `std::holds_alternative<T>` / `std::get<T>`, or dispatch with `std::visit`. JSON round-trip is automatic — the `kind` field discriminates on deserialize.
-
-ADL hooks `to_json(nlohmann::json&, const Voice&)` and `from_json(const nlohmann::json&, Voice&)` are exported but apps don't usually call them directly — they fire when a `Melody` round-trips through `def_type`.
+> ⚠️ Variant type currently being refactored to use `def_type::oneof_by_field` per the def_type docs. This section will be updated once the refactor lands.
 
 ---
 

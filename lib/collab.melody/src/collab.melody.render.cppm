@@ -11,7 +11,6 @@ module;
 #include <cmath>
 #include <cstdint>
 #include <numbers>
-#include <variant>
 #include <vector>
 
 export module collab.melody.render;
@@ -233,7 +232,7 @@ void mix_decay(std::vector<std::int32_t>& buf, const DecayVoice& v) {
 }  // anonymous namespace
 
 [[nodiscard]] int voice_duration_ms(const Voice& voice) {
-    return std::visit(overloaded{
+    return voice.match(
         [](const ToneVoice&    v) { return v.duration_ms; },
         [](const GlideVoice&   v) { return v.duration_ms; },
         [](const PianoVoice&   v) {
@@ -244,12 +243,14 @@ void mix_decay(std::vector<std::int32_t>& buf, const DecayVoice& v) {
         [](const VibratoVoice& v) { return v.duration_ms; },
         [](const DecayVoice&   v) { return v.duration_ms; },
         [](const SilenceVoice& v) { return v.duration_ms; }
-    }, voice);
+    );
 }
 
+namespace {
 [[nodiscard]] int voice_start_ms(const Voice& voice) {
-    return std::visit([](const auto& v) { return v.start_ms; }, voice);
+    return voice.match([](const auto& v) { return v.start_ms; });
 }
+}  // anonymous namespace
 
 [[nodiscard]] int derive_duration_ms(const Melody& melody) {
     if (melody.duration_ms > 0) return melody.duration_ms;
@@ -270,7 +271,7 @@ void mix_decay(std::vector<std::int32_t>& buf, const DecayVoice& v) {
     std::vector<std::int32_t> mix(ms_to_samples(total_ms), 0);
 
     for (const auto& voice : melody.voices) {
-        std::visit(overloaded{
+        voice.match(
             [&](const ToneVoice&    v) { mix_tone(mix,    v); },
             [&](const GlideVoice&   v) { mix_glide(mix,   v); },
             [&](const PianoVoice&   v) { mix_piano(mix,   v); },
@@ -278,7 +279,7 @@ void mix_decay(std::vector<std::int32_t>& buf, const DecayVoice& v) {
             [&](const VibratoVoice& v) { mix_vibrato(mix, v); },
             [&](const DecayVoice&   v) { mix_decay(mix,   v); },
             [](const SilenceVoice&) { /* gap on the timeline */ }
-        }, voice);
+        );
     }
 
     return RenderedAudio{ finalize_mix(mix), kSampleRate };

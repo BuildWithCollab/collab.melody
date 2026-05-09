@@ -1,23 +1,10 @@
-// Wave shape, voice kinds, and the `Voice` variant used by `Melody`.
-//
-// Each voice is a plain C++ struct with sensible defaults — designated
-// initializers in C++, plain JSON for tweakers. Each struct's `kind`
-// member defaults to its label and is included in the serialized JSON.
-//
-// Voice is a std::variant; we provide nlohmann ADL hooks (to_json /
-// from_json) that switch on the `kind` field for polymorphic JSON.
-// from_json on the variant reads `kind` and dispatches to the right
-// alternative; to_json visits and delegates to def_type::to_json for
-// the underlying struct (which serializes the `kind` field too).
+// Wave shape and voice kinds used by `Melody`.
 
 module;
 
 #include <def_type.hpp>
-#include <nlohmann/json.hpp>
 
-#include <stdexcept>
 #include <string>
-#include <variant>
 #include <vector>
 
 export module collab.melody.voices;
@@ -118,51 +105,17 @@ struct SilenceVoice {
     int         duration_ms = 100;
 };
 
-// The variant. ToneVoice is first so default-construction picks a
-// benign all-defaulted alternative.
-using Voice = std::variant<
-    ToneVoice,
-    GlideVoice,
-    PianoVoice,
-    TremoloVoice,
-    VibratoVoice,
-    DecayVoice,
-    SilenceVoice
+// The variant. def_type::oneof_by_field uses each voice struct's
+// `kind` field as the discriminator. JSON round-trip is handled by
+// def_type — no custom hooks.
+using Voice = def_type::oneof_by_field<"kind",
+    def_type::oneof_type<ToneVoice,    "tone">,
+    def_type::oneof_type<GlideVoice,   "glide">,
+    def_type::oneof_type<PianoVoice,   "piano">,
+    def_type::oneof_type<TremoloVoice, "tremolo">,
+    def_type::oneof_type<VibratoVoice, "vibrato">,
+    def_type::oneof_type<DecayVoice,   "decay">,
+    def_type::oneof_type<SilenceVoice, "silence">
 >;
-
-// Helper for the std::visit(overloaded{...}, variant) idiom.
-template <class... Ts>
-struct overloaded : Ts... { using Ts::operator()...; };
-
-// ─── nlohmann ADL hooks for the Voice variant ──────────────────────
-//
-// def_type's value_to_json/value_from_json fall through to nlohmann's
-// ADL hooks for non-reflected types, so these get picked up when a
-// Melody (which contains std::vector<Voice>) round-trips. The `kind`
-// field on each underlying struct is what makes from_json deterministic.
-
-inline void to_json(nlohmann::json& j, const Voice& voice) {
-    std::visit([&](const auto& v) { j = def_type::to_json(v); }, voice);
-}
-
-inline void from_json(const nlohmann::json& j, Voice& voice) {
-    if (!j.is_object()) {
-        throw std::logic_error("collab.melody: voice JSON must be an object");
-    }
-    if (!j.contains("kind") || !j["kind"].is_string()) {
-        throw std::logic_error("collab.melody: voice JSON missing string `kind` field");
-    }
-    const auto kind = j["kind"].get<std::string>();
-
-    if (kind == "tone")    { voice = def_type::from_json<ToneVoice>(j);    return; }
-    if (kind == "glide")   { voice = def_type::from_json<GlideVoice>(j);   return; }
-    if (kind == "piano")   { voice = def_type::from_json<PianoVoice>(j);   return; }
-    if (kind == "tremolo") { voice = def_type::from_json<TremoloVoice>(j); return; }
-    if (kind == "vibrato") { voice = def_type::from_json<VibratoVoice>(j); return; }
-    if (kind == "decay")   { voice = def_type::from_json<DecayVoice>(j);   return; }
-    if (kind == "silence") { voice = def_type::from_json<SilenceVoice>(j); return; }
-
-    throw std::logic_error("collab.melody: unknown voice kind '" + kind + "'");
-}
 
 }  // namespace collab::melody

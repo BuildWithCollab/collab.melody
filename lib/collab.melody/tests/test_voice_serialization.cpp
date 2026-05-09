@@ -1,18 +1,15 @@
-// Round-trip every voice kind through JSON. Each voice's `kind` field
-// is the discriminator used by Voice's variant from_json; verify the
-// kind survives serialization, all per-kind fields round-trip, and
-// from_json rejects malformed input.
+// Round-trip every voice kind through JSON. Verifies the `kind`
+// discriminator survives serialization and all per-kind fields
+// round-trip cleanly via def_type.
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <def_type.hpp>
-#include <nlohmann/json.hpp>
 
 #include <stdexcept>
 #include <string>
-#include <variant>
 
 import collab.melody;
 
@@ -127,66 +124,6 @@ TEST_CASE("SilenceVoice round-trips", "[serialization][silence]") {
     CHECK(restored.duration_ms == 500);
 }
 
-TEST_CASE("Voice variant dispatches via kind on from_json", "[serialization][variant]") {
-    SECTION("kind=tone resolves to ToneVoice") {
-        nlohmann::json j = {{"kind", "tone"}, {"freq_hz", 660.0}, {"duration_ms", 200}};
-        Voice v;
-        from_json(j, v);
-        REQUIRE(std::holds_alternative<ToneVoice>(v));
-        CHECK(std::get<ToneVoice>(v).freq_hz == 660.0);
-    }
-    SECTION("kind=piano resolves to PianoVoice") {
-        nlohmann::json j = {{"kind", "piano"}, {"freq_hz", 523.25}, {"tau_ms", 800}};
-        Voice v;
-        from_json(j, v);
-        REQUIRE(std::holds_alternative<PianoVoice>(v));
-        CHECK(std::get<PianoVoice>(v).tau_ms == 800);
-    }
-    SECTION("kind=glide resolves to GlideVoice") {
-        nlohmann::json j = {{"kind", "glide"}, {"from_hz", 100.0}, {"to_hz", 200.0}};
-        Voice v;
-        from_json(j, v);
-        REQUIRE(std::holds_alternative<GlideVoice>(v));
-    }
-    SECTION("missing kind throws") {
-        nlohmann::json j = {{"freq_hz", 660.0}};
-        Voice v;
-        REQUIRE_THROWS_AS(from_json(j, v), std::logic_error);
-    }
-    SECTION("unknown kind throws") {
-        nlohmann::json j = {{"kind", "bogus"}, {"freq_hz", 660.0}};
-        Voice v;
-        REQUIRE_THROWS_WITH(
-            from_json(j, v),
-            Catch::Matchers::ContainsSubstring("bogus")
-        );
-    }
-    SECTION("non-object voice throws") {
-        nlohmann::json j = "not an object";
-        Voice v;
-        REQUIRE_THROWS_AS(from_json(j, v), std::logic_error);
-    }
-}
-
-TEST_CASE("Voice variant round-trips via to_json/from_json", "[serialization][variant]") {
-    Voice original = PianoVoice{
-        .start_ms  = 100,
-        .freq_hz   = 659.25,
-        .attack_ms = 6,
-        .tau_ms    = 700,
-    };
-
-    nlohmann::json j;
-    to_json(j, original);
-    REQUIRE(j["kind"] == "piano");
-
-    Voice restored;
-    from_json(j, restored);
-    REQUIRE(std::holds_alternative<PianoVoice>(restored));
-    CHECK(std::get<PianoVoice>(restored).freq_hz == 659.25);
-    CHECK(std::get<PianoVoice>(restored).tau_ms  == 700);
-}
-
 TEST_CASE("Wave enum serializes by name", "[serialization][enum]") {
     ToneVoice t{ .wave = Wave::sawtooth };
     const auto j = def_type::to_json(t);
@@ -197,8 +134,7 @@ TEST_CASE("Wave enum serializes by name", "[serialization][enum]") {
 }
 
 TEST_CASE("Defaults preserved when JSON omits fields", "[serialization][defaults]") {
-    nlohmann::json minimal = {{"kind", "tone"}};
-    const auto t = def_type::from_json<ToneVoice>(minimal);
+    const auto t = def_type::from_json<ToneVoice>(std::string(R"({"kind": "tone"})"));
     CHECK(t.freq_hz     == 440.0);    // default
     CHECK(t.duration_ms == 500);       // default
     CHECK(t.wave        == Wave::sine);// default

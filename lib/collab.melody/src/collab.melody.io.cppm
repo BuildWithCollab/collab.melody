@@ -1,13 +1,9 @@
-// Load melodies from / save melodies to JSON.
-//
-// The actual struct ↔ JSON marshalling is handled by def_type's
-// reflection — these helpers just wrap file IO around it and surface
-// useful errors for the common "user typo'd a JSON file" case.
+// File IO for melodies. All actual JSON marshalling is delegated to
+// def_type — these helpers just open files and forward strings.
 
 module;
 
 #include <def_type.hpp>
-#include <nlohmann/json.hpp>
 
 export module collab.melody.io;
 
@@ -16,26 +12,14 @@ import collab.melody.melody;
 
 export namespace collab::melody {
 
-// Load a single melody from a JSON file. Throws std::runtime_error
-// (with a descriptive message including the path) if the file can't
-// be opened, isn't valid JSON, or doesn't match the Melody schema.
 [[nodiscard]] Melody load_from_json_file(const std::filesystem::path& path);
-
-// Parse a melody from an already-loaded JSON string. Same error
-// behavior as load_from_json_file.
 [[nodiscard]] Melody load_from_json_string(std::string_view json);
 
-// Serialize a melody to a JSON string. `indent = -1` is compact;
-// `indent >= 0` is pretty-printed with that many spaces.
 [[nodiscard]] std::string to_json_string(const Melody& melody, int indent = 2);
+void                      save_to_json_file(const Melody& melody, const std::filesystem::path& path);
 
-// Serialize a melody to a JSON file (pretty-printed).
-void save_to_json_file(const Melody& melody, const std::filesystem::path& path);
-
-// Load every *.json file in `dir` (non-recursive), keyed by file
-// stem (e.g. "doorbell.json" → key "doorbell"). Files that fail to
-// parse are surfaced via the error_callback (which can be empty if
-// you want failures silently skipped).
+// Load every *.json file in `dir` (non-recursive), keyed by file stem.
+// Failures per file are reported via error_callback; other files still load.
 [[nodiscard]] std::map<std::string, Melody> load_all_from_directory(
     const std::filesystem::path& dir,
     std::function<void(const std::filesystem::path&, std::string_view error)> error_callback = {}
@@ -48,12 +32,7 @@ void save_to_json_file(const Melody& melody, const std::filesystem::path& path);
 namespace collab::melody {
 
 [[nodiscard]] Melody load_from_json_string(std::string_view json) {
-    try {
-        auto parsed = nlohmann::json::parse(json);
-        return def_type::from_json<Melody>(parsed);
-    } catch (const std::exception& e) {
-        throw std::runtime_error(std::string("collab.melody: JSON parse failed: ") + e.what());
-    }
+    return def_type::from_json<Melody>(std::string(json));
 }
 
 [[nodiscard]] Melody load_from_json_file(const std::filesystem::path& path) {
@@ -63,18 +42,11 @@ namespace collab::melody {
     }
     std::stringstream buf;
     buf << in.rdbuf();
-    try {
-        return load_from_json_string(buf.str());
-    } catch (const std::exception& e) {
-        // Re-wrap with the path for a more useful error.
-        throw std::runtime_error(
-            std::string("collab.melody: failed to load ") + path.string() + ": " + e.what());
-    }
+    return load_from_json_string(buf.str());
 }
 
 [[nodiscard]] std::string to_json_string(const Melody& melody, int indent) {
-    auto j = def_type::to_json(melody);
-    return j.dump(indent);
+    return def_type::to_json_string(melody, indent);
 }
 
 void save_to_json_file(const Melody& melody, const std::filesystem::path& path) {

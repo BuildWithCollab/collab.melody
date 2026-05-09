@@ -1,14 +1,11 @@
-// Round-trip a Melody (which contains std::vector<Voice>) through JSON.
-// Verifies the full pipeline: voice ADL hooks fire correctly when the
-// vector is walked by def_type, and the per-voice kind dispatch lands
-// on the right alternatives during from_json.
+// Round-trip a Melody (with mixed voice kinds) through JSON. Verifies
+// def_type::oneof_by_field dispatches each voice to the right alt
+// based on the `kind` discriminator, and that all per-voice fields
+// survive the round-trip.
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <def_type.hpp>
-#include <nlohmann/json.hpp>
-
-#include <variant>
 
 import collab.melody;
 
@@ -22,7 +19,7 @@ TEST_CASE("Empty Melody round-trips", "[melody][serialization]") {
     CHECK(restored.voices.empty());
 }
 
-TEST_CASE("Multi-voice Melody round-trips with mixed kinds", "[melody][serialization]") {
+TEST_CASE("Multi-voice Melody serializes kinds in order", "[melody][serialization]") {
     Melody original{
         .name = "doorbell",
         .voices = {
@@ -38,39 +35,47 @@ TEST_CASE("Multi-voice Melody round-trips with mixed kinds", "[melody][serializa
     CHECK(j["voices"][0]["kind"] == "decay");
     CHECK(j["voices"][1]["kind"] == "decay");
     CHECK(j["voices"][2]["kind"] == "tone");
+}
 
-    const auto restored = def_type::from_json<Melody>(j);
-    REQUIRE(restored.name == "doorbell");
+TEST_CASE("Multi-voice Melody round-trips with mixed kinds", "[melody][serialization]") {
+    Melody original{
+        .name = "doorbell",
+        .voices = {
+            DecayVoice{ .start_ms =   0, .freq_hz = 660.0, .duration_ms = 600, .tau_ms = 250 },
+            DecayVoice{ .start_ms = 200, .freq_hz = 520.0, .duration_ms = 800, .tau_ms = 350 },
+            ToneVoice { .start_ms = 800, .freq_hz = 440.0, .duration_ms = 100 },
+        }
+    };
+
+    const auto restored = def_type::from_json<Melody>(def_type::to_json(original));
     REQUIRE(restored.voices.size() == 3);
 
-    REQUIRE(std::holds_alternative<DecayVoice>(restored.voices[0]));
-    CHECK(std::get<DecayVoice>(restored.voices[0]).freq_hz == 660.0);
+    REQUIRE(restored.voices[0].is<DecayVoice>());
+    CHECK(restored.voices[0].as<DecayVoice>()->freq_hz == 660.0);
 
-    REQUIRE(std::holds_alternative<DecayVoice>(restored.voices[1]));
-    CHECK(std::get<DecayVoice>(restored.voices[1]).start_ms == 200);
+    REQUIRE(restored.voices[1].is<DecayVoice>());
+    CHECK(restored.voices[1].as<DecayVoice>()->start_ms == 200);
 
-    REQUIRE(std::holds_alternative<ToneVoice>(restored.voices[2]));
-    CHECK(std::get<ToneVoice>(restored.voices[2]).freq_hz == 440.0);
+    REQUIRE(restored.voices[2].is<ToneVoice>());
+    CHECK(restored.voices[2].as<ToneVoice>()->freq_hz == 440.0);
 }
 
 TEST_CASE("Melody round-trips through string", "[melody][serialization]") {
-    const std::string json_text = R"({
+    const auto m = def_type::from_json<Melody>(std::string(R"({
         "name": "chord",
-        "duration_ms": 0,
         "voices": [
             { "kind": "piano", "start_ms":   0, "freq_hz": 523.25, "attack_ms":  3, "tau_ms": 600 },
             { "kind": "piano", "start_ms": 180, "freq_hz": 659.25, "attack_ms":  6, "tau_ms": 600 },
             { "kind": "piano", "start_ms": 360, "freq_hz": 783.99, "attack_ms": 12, "tau_ms": 600 }
         ]
-    })";
+    })"));
 
-    const auto m = def_type::from_json<Melody>(nlohmann::json::parse(json_text));
     REQUIRE(m.name == "chord");
     REQUIRE(m.voices.size() == 3);
     for (const auto& v : m.voices) {
-        REQUIRE(std::holds_alternative<PianoVoice>(v));
+        REQUIRE(v.is<PianoVoice>());
     }
-    CHECK(std::get<PianoVoice>(m.voices[2]).attack_ms == 12);
+    CHECK(m.voices[2].as<PianoVoice>()->attack_ms == 12);
 }
 
 TEST_CASE("Melody preserves all voice kinds in one melody", "[melody][serialization]") {
@@ -89,11 +94,11 @@ TEST_CASE("Melody preserves all voice kinds in one melody", "[melody][serializat
 
     const auto restored = def_type::from_json<Melody>(def_type::to_json(original));
     REQUIRE(restored.voices.size() == 7);
-    CHECK(std::holds_alternative<ToneVoice>   (restored.voices[0]));
-    CHECK(std::holds_alternative<GlideVoice>  (restored.voices[1]));
-    CHECK(std::holds_alternative<PianoVoice>  (restored.voices[2]));
-    CHECK(std::holds_alternative<TremoloVoice>(restored.voices[3]));
-    CHECK(std::holds_alternative<VibratoVoice>(restored.voices[4]));
-    CHECK(std::holds_alternative<DecayVoice>  (restored.voices[5]));
-    CHECK(std::holds_alternative<SilenceVoice>(restored.voices[6]));
+    CHECK(restored.voices[0].is<ToneVoice>());
+    CHECK(restored.voices[1].is<GlideVoice>());
+    CHECK(restored.voices[2].is<PianoVoice>());
+    CHECK(restored.voices[3].is<TremoloVoice>());
+    CHECK(restored.voices[4].is<VibratoVoice>());
+    CHECK(restored.voices[5].is<DecayVoice>());
+    CHECK(restored.voices[6].is<SilenceVoice>());
 }

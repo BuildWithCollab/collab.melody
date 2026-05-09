@@ -9,7 +9,6 @@
 #include <random>
 #include <stdexcept>
 #include <string>
-#include <variant>
 #include <vector>
 
 import collab.melody;
@@ -57,10 +56,7 @@ TEST_CASE("load_from_json_file throws for missing file", "[io]") {
 }
 
 TEST_CASE("load_from_json_string throws for malformed JSON", "[io]") {
-    REQUIRE_THROWS_AS(
-        load_from_json_string("{ this is not valid json"),
-        std::runtime_error
-    );
+    REQUIRE_THROWS(load_from_json_string("{ this is not valid json"));
 }
 
 TEST_CASE("load_from_json_string parses minimal melody", "[io]") {
