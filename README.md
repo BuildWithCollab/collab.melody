@@ -62,6 +62,223 @@ Fifteen reference melodies ship under `melodies/`. Drop them in, copy them, muta
 
 ---
 
+## Public API
+
+All declarations live in `namespace collab::melody`. Most apps only need `import collab.melody;` (the umbrella) and never name a submodule directly.
+
+### `collab.melody.voices`
+
+Data types — voice structs plus the `Voice` variant. Each voice's `kind` member defaults to its label and is the discriminator used by JSON round-trip.
+
+```cpp
+namespace collab::melody {
+
+enum class Wave { sine, square, triangle, sawtooth };
+
+struct ToneVoice {
+    std::string kind        = "tone";
+    int         start_ms    = 0;
+    double      freq_hz     = 440.0;
+    int         duration_ms = 500;
+    Wave        wave        = Wave::sine;
+    int         fade_ms     = 8;
+    double      volume      = 0.6;
+};
+
+struct GlideVoice {
+    std::string kind        = "glide";
+    int         start_ms    = 0;
+    double      from_hz     = 220.0;
+    double      to_hz       = 880.0;
+    int         duration_ms = 800;
+    Wave        wave        = Wave::sine;
+    int         fade_ms     = 8;
+    double      volume      = 0.6;
+};
+
+struct PianoVoice {
+    std::string         kind        = "piano";
+    int                 start_ms    = 0;
+    double              freq_hz     = 440.0;
+    int                 attack_ms   = 5;
+    int                 tau_ms      = 500;
+    double              volume      = 0.4;
+    int                 duration_ms = 0;             // 0 = derive from attack + ~5*tau
+    std::vector<double> harmonics   = {1.0, 0.4, 0.2};
+};
+
+struct TremoloVoice {
+    std::string kind        = "tremolo";
+    int         start_ms    = 0;
+    double      freq_hz     = 440.0;
+    int         duration_ms = 1500;
+    double      lfo_hz      = 6.0;
+    double      depth       = 0.7;                   // 0..1, fraction the volume dips by
+    int         fade_ms     = 8;
+    double      volume      = 0.6;
+};
+
+struct VibratoVoice {
+    std::string kind            = "vibrato";
+    int         start_ms        = 0;
+    double      freq_hz         = 440.0;
+    int         duration_ms     = 1500;
+    double      lfo_hz          = 6.0;
+    double      depth_semitones = 0.5;               // pitch wobble in semitones
+    int         fade_ms         = 8;
+    double      volume          = 0.6;
+};
+
+struct DecayVoice {
+    std::string kind        = "decay";
+    int         start_ms    = 0;
+    double      freq_hz     = 880.0;
+    int         duration_ms = 1200;
+    int         tau_ms      = 200;                   // 1/e amplitude every tau_ms
+    int         fade_in_ms  = 2;
+    double      volume      = 0.7;
+};
+
+struct SilenceVoice {
+    std::string kind        = "silence";
+    int         start_ms    = 0;
+    int         duration_ms = 100;
+};
+
+using Voice = std::variant<
+    ToneVoice, GlideVoice, PianoVoice,
+    TremoloVoice, VibratoVoice, DecayVoice, SilenceVoice
+>;
+
+// nlohmann ADL hooks — fire automatically when a Melody round-trips
+// through def_type. Apps don't typically call these directly.
+void to_json  (nlohmann::json& j, const Voice& v);
+void from_json(const nlohmann::json& j, Voice& v);
+
+}  // namespace collab::melody
+```
+
+### `collab.melody.melody`
+
+The top-level container — a name and a list of voices on a shared timeline.
+
+```cpp
+namespace collab::melody {
+
+struct Melody {
+    std::string        name;
+    int                duration_ms = 0;   // 0 = derive from voices
+    std::vector<Voice> voices;
+};
+
+}
+```
+
+### `collab.melody.render`
+
+Mix every voice into a single PCM buffer. int32 accumulator internally so heavy polyphony doesn't smear per-voice clipping into the result.
+
+```cpp
+namespace collab::melody {
+
+constexpr int kSampleRate = 44100;        // mono int16 PCM @ 44.1 kHz
+
+struct RenderedAudio {
+    std::vector<std::int16_t> samples;
+    int                       sample_rate = kSampleRate;
+};
+
+// One voice's audible length. PianoVoice with duration_ms=0 is auto-
+// derived from attack + 5*tau; everything else returns its duration_ms.
+[[nodiscard]] int voice_duration_ms(const Voice& voice);
+
+// max(start_ms + duration_ms) across all voices, or melody.duration_ms
+// if non-zero.
+[[nodiscard]] int derive_duration_ms(const Melody& melody);
+
+// The thing you usually call.
+[[nodiscard]] RenderedAudio render(const Melody& melody);
+
+}
+```
+
+### `collab.melody.io`
+
+JSON load/save plus bulk-loading a folder of melodies.
+
+```cpp
+namespace collab::melody {
+
+// Throw std::runtime_error with a useful message on file IO / parse errors.
+[[nodiscard]] Melody load_from_json_file  (const std::filesystem::path& path);
+[[nodiscard]] Melody load_from_json_string(std::string_view json);
+
+// indent < 0  → compact;  indent >= 0  → pretty-printed with that many spaces.
+[[nodiscard]] std::string to_json_string(const Melody& melody, int indent = 2);
+
+void save_to_json_file(const Melody& melody, const std::filesystem::path& path);
+
+// Load every *.json in `dir` (non-recursive), keyed by file stem.
+// Failures are reported via the callback (if supplied); other files still load.
+// Empty / missing dir returns empty map — never throws.
+[[nodiscard]] std::map<std::string, Melody> load_all_from_directory(
+    const std::filesystem::path& dir,
+    std::function<void(const std::filesystem::path&, std::string_view error)> error_callback = {}
+);
+
+}
+```
+
+### `collab.melody.player`
+
+miniaudio-backed playback. Two flavors — one-shot blocking, or a reusable `Player` that keeps a device warm across many sounds.
+
+```cpp
+namespace collab::melody {
+
+// Open device, play to completion, close. Returns false if device init failed.
+bool play_blocking(const RenderedAudio& audio);
+bool play_blocking(const Melody& melody);          // = play_blocking(render(melody))
+
+// Reusable player. One sound at a time — calling play() while another is
+// playing waits for the previous one to finish, then starts the new one.
+class Player {
+public:
+    Player();
+    ~Player();
+
+    Player(const Player&)            = delete;
+    Player& operator=(const Player&) = delete;
+    Player(Player&&)                 = delete;
+    Player& operator=(Player&&)      = delete;
+
+    [[nodiscard]] bool play(const RenderedAudio& audio);
+    [[nodiscard]] bool play(const Melody& melody);
+
+    [[nodiscard]] bool is_playing() const noexcept;
+
+    void wait();              // block until the current play (if any) finishes
+    void cancel() noexcept;   // stop in-flight playback; safe from any thread
+};
+
+}
+```
+
+### `collab.melody`
+
+Umbrella module. Just re-exports every submodule:
+
+```cpp
+export module collab.melody;
+export import collab.melody.voices;
+export import collab.melody.melody;
+export import collab.melody.render;
+export import collab.melody.io;
+export import collab.melody.player;
+```
+
+---
+
 ## C++ authoring
 
 ```cpp
